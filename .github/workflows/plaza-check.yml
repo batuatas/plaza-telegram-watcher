@@ -3,6 +3,11 @@ name: Plaza Telegram Watcher
 on:
   # Allow manual trigger from the Actions tab
   workflow_dispatch:
+    inputs:
+      send_test_message:
+        description: "Send a Telegram test message (true/false)"
+        required: false
+        default: "false"
 
   # Run every 5 minutes
   schedule:
@@ -58,6 +63,17 @@ jobs:
 
       - name: Install Playwright Chromium with system dependencies
         run: python -m playwright install --with-deps chromium
+
+      - name: Send Telegram smoke-test message
+        if: ${{ github.event.inputs.send_test_message == 'true' }}
+        run: |
+          curl -s -X POST \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_CHAT_ID}" \
+            -d "text=%E2%9C%85 GitHub Actions Telegram test works." \
+            -d "disable_web_page_preview=true" \
+            -o /dev/null
+          echo "Smoke-test message sent."
 
       - name: Run Plaza watcher (one shot)
         run: python plaza_github_once.py
