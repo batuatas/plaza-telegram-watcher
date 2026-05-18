@@ -1,0 +1,21 @@
+# Secrets — NEVER commit these
+.env
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# macOS
+.DS_Store
+.Rhistory
+
+# Debug dumps
+debug_plaza_*.txt
+
+# Logs
+*.log
+
+# NOTE: plaza_seen.sqlite3 is intentionally NOT ignored.
+# GitHub Actions commits it back after each run to persist seen listing IDs.

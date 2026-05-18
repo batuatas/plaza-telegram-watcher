@@ -1,0 +1,75 @@
+name: Plaza Telegram Watcher
+
+on:
+  # Allow manual trigger from the Actions tab
+  workflow_dispatch:
+
+  # Run every 5 minutes
+  schedule:
+    - cron: "*/5 * * * *"
+
+# Allow this workflow to push back the updated DB file
+permissions:
+  contents: write
+
+# Prevent overlapping runs; cancel any in-progress run when a new one starts
+concurrency:
+  group: plaza-telegram-watcher
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check Plaza listings
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      LIST_URL: "https://plaza.newnewnew.space/aanbod/wonen#?gesorteerd-op=publicatiedatum-"
+      CITY_FILTER: "Amsterdam"
+      MAX_TOTAL_RENT: ""
+      SEND_EXISTING_ON_FIRST_RUN: "false"
+      DB_PATH: "plaza_seen.sqlite3"
+      HEADLESS: "true"
+      BROWSER_LOCALE: "nl-NL"
+      SLOW_MO_MS: "0"
+      DEBUG_DUMP_TEXT: "false"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright Chromium with system dependencies
+        run: python -m playwright install --with-deps chromium
+
+      - name: Run Plaza watcher (one shot)
+        run: python plaza_github_once.py
+
+      - name: Commit updated seen-listings DB (if changed)
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add plaza_seen.sqlite3
+          if git diff --cached --quiet; then
+            echo "No changes to plaza_seen.sqlite3 — nothing to commit."
+          else
+            git commit -m "chore: update plaza_seen.sqlite3 [skip ci]"
+            git push
+          fi
